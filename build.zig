@@ -8,28 +8,30 @@ pub fn build(b: *std.build.Builder) void {
     // Compile elf2nro for the current machine
     const native_target = std.zig.CrossTarget{ .os_tag = null, .cpu_arch = null };
 
-    // Standard release options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
+    const exe = b.addExecutable(.{
+        .name = "zig-hos",
+        .target = switch_target,
+        .link_libc = true,
+        .root_source_file = .{ .path = "src/main.c" },
+        .optimize = b.standardOptimizeOption(.{}),
+    });
+    b.installArtifact(exe);
 
-    const exe = b.addExecutable("zig_arm64", "src/main.c");
-    exe.setTarget(switch_target);
-    exe.setBuildMode(mode);
-    exe.addIncludePath("src");
-    exe.linkLibC();
-    exe.install();
+    const elf2nro = b.addExecutable(.{
+        .name = "elf2nro",
+        .root_source_file = .{ .path = "ext/switch-tools/src/elf2nro.c" },
+        .link_libc = true,
+        .target = native_target,
+    });
 
-    const elf2nro = b.addExecutable("elf2nro", "ext/switch-tools/src/elf2nro.c");
-    elf2nro.setTarget(native_target);
+    // No idea why we can't just pass in normal strings anymore, but this is required now...
+    elf2nro.addCSourceFile(.{ .file = std.build.LazyPath.relative("ext/switch-tools/src/romfs.c"), .flags = &.{} });
+    elf2nro.addCSourceFile(.{ .file = std.build.LazyPath.relative("ext/switch-tools/src/filepath.c"), .flags = &.{} });
+    elf2nro.addIncludePath(.{ .path = "ext/switch-tools/src" });
+    elf2nro.addIncludePath(.{ .path = "include" });
+    b.installArtifact(elf2nro);
 
-    // We could add these both with addCSourceFiles but it's more trouble than it's worth
-    elf2nro.addCSourceFile("ext/switch-tools/src/romfs.c", &.{});
-    elf2nro.addCSourceFile("ext/switch-tools/src/filepath.c", &.{});
-    elf2nro.addIncludePath("ext/switch-tools/src");
-    elf2nro.linkLibC();
-    elf2nro.install();
-
-    const build_nro = elf2nro.run();
+    const build_nro = b.addRunArtifact(elf2nro);
     build_nro.addArtifactArg(exe);
     build_nro.addArg("zig_arm64.nro");
     build_nro.addArg("--icon=thumb.jpeg");
