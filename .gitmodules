@@ -1,0 +1,3 @@
+[submodule "ext/switch-tools"]
+	path = ext/switch-tools
+	url = https://github.com/switchbrew/switch-tools
