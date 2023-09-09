@@ -15,6 +15,9 @@ pub fn build(b: *std.build.Builder) void {
         .root_source_file = .{ .path = "src/main.c" },
         .optimize = b.standardOptimizeOption(.{}),
     });
+    exe.addAssemblyFile(.{ .path = "ext/libnx/nx/source/kernel/svc.s" });
+    exe.addAssemblyFile(.{ .path = "src/nro_entry.s" });
+    exe.setLinkerScript(.{ .path = "src/set_base_addr.ld" });
     b.installArtifact(exe);
 
     const elf2nro = b.addExecutable(.{
@@ -33,7 +36,7 @@ pub fn build(b: *std.build.Builder) void {
 
     const build_nro = b.addRunArtifact(elf2nro);
     build_nro.addArtifactArg(exe);
-    build_nro.addArg("zig_arm64.nro");
+    build_nro.addArg("zig-hos.nro");
     build_nro.addArg("--icon=thumb.jpeg");
 
     const build_step = b.step("nro", "convert to an NRO");
