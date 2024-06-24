@@ -2,6 +2,16 @@
 #include <sf/tipc.h>
 #include <sf/hipc.h>
 
+typedef enum {
+    RESULT_SUCESS,
+    RESULT_UNIMPLEMENTED,
+    RESULT_INVALID_ARG,
+    RESULT_IN_PROGRESS,
+    RESULT_NO_ASYNC_OPERATION,
+    RESULT_INVALID_ASYNC_OPERATION,
+    RESULT_NOT_PERMITTED, // 8.0.0+
+}syscall_result;
+
 HipcHeader header = {0};
 
 int main() {
