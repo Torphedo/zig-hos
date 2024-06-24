@@ -1,17 +1,23 @@
-#include <stdbool.h>
-#include <string.h>
-#include <stdint.h>
+#include <kernel/svc.h>
+#include <sf/tipc.h>
+#include <sf/hipc.h>
 
-#include "hos_syscall.h"
+HipcHeader header = {0};
 
 int main() {
-    uint32_t num = 5;
-
-    const char msg[] = "Zig syscall test.\n";
-
-    while (true) {
-        svcOutputDebugString(msg, strlen(msg));
+    Handle sm;
+    Result rc = svcConnectToNamedPort(&sm, "sm:");
+    if (rc != RESULT_SUCESS) {
+        const char sm_fail[] = "Failed to open port sm:\n";
+        svcOutputDebugString(sm_fail, sizeof(sm_fail));
     }
-    return num;
+    else {
+        const char sm_pass[] = "Got Service Manager handle.\n";
+        svcOutputDebugString(sm_pass, sizeof(sm_pass));
+    }
+
+    const char msg[] = "Hello from C!\n";
+    svcOutputDebugString(msg, sizeof(msg));
+    return 0;
 }
 
