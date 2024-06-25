@@ -7,12 +7,12 @@
 
 .section ".text.crt0","ax"
 
-.global __module_start
-__module_start:
-    b _pre_start
+.global _start
+_start:
+    b main
 
     // Put MOD0 offset in the NRO file.
-    .word __nx_mod0 - __module_start
+    .word __nx_mod0 - _start
 
     // MOD0 has to start after the NRO header and at a power of 2 offset
     .balign 0x80
@@ -28,18 +28,4 @@ __nx_mod0:
 
 // Put the rest of the code at the next 0x10 boundary just to make it neater
 .balign 0x10
-
-test_text:
-.ascii "Assembly printing test\n"
-.balign 0x10
-_pre_start:
-    adr X0, test_text
-    movz X1, 23
-    svc 0x27
-    
-    b main
-
-    # elf2nro complains about the ELF format if we don't branch to _start,
-    # so this is a dirty hack to link in libc even though we can't use it
-    b _start
 
