@@ -1,6 +1,7 @@
 OUTPUT_FORMAT(elf64-littleaarch64)
 OUTPUT_ARCH(aarch64)
-ENTRY(__module_start)
+
+ENTRY(_module_start)
 
 PHDRS
 {
@@ -8,12 +9,14 @@ PHDRS
   rodata PT_LOAD FLAGS(4);
   data PT_LOAD FLAGS(6);
   dynamic PT_DYNAMIC;
+  tls_init PT_TLS;
+  tls PT_TLS;
 }
 
 SECTIONS
 {
-  PROVIDE(__start__ = 0x0);
-  . = __start__;
+  PROVIDE(_module_start = 0x0);
+  . = _module_start;
   __code_start__ = .;
 
   /* App code */
@@ -79,6 +82,7 @@ SECTIONS
   /* Read-write sections */
   . = ALIGN(0x1000);
 
+  PROVIDE (__data_start = .);
   /* App data */
   .data : {
     *(.data .data.*)
@@ -135,34 +139,63 @@ SECTIONS
 
   /* Thread Local sections */
 
-  .tdata : {
+  .data : /* For ld.bfd:  ALIGN_WITH_INPUT */ {
+      *(.data .data.*)
+      *(.gnu.linkonce.d.*)
+
+      /* Need to pre-align so that the symbols come after padding */
+      . = ALIGN(8);
+
+      PROVIDE( __global_pointer$ = . + 0x800 );
+      PROVIDE( _gp = . + 0x8000);
+      *(.sdata .sdata.* .sdata2.*)
+      *(.gnu.linkonce.s.*)
+  }
+  PROVIDE(__data_start = ADDR(.data));
+  PROVIDE(__data_source = LOADADDR(.data));
+
+  .tdata : ALIGN(__tls_align) {
     __tdata_align_abs__ = ABSOLUTE(.);
     __tdata_start__ = .;
     *(.tdata .tdata.*)
     __tdata_end__ = .;
-  } :data
+    PROVIDE(__data_end = .);
+  } :data :tls_init
 
-  .tbss : {
+  PROVIDE( __data_size = __data_end - __data_start );
+  PROVIDE( __data_source_size = __data_source_end - __data_source );
+  PROVIDE( __tls_base = ADDR(.tdata));
+  PROVIDE( __tdata_start = ADDR(.tdata));
+
+  .tbss (NOLOAD) : {
     __tbss_align_abs__ = ABSOLUTE(.);
     __tbss_start__ = .;
     *(.tbss .tbss.*)
     *(.tcommon)
     __tbss_end__ = .;
-  } :data
+  } :data :tls
+  PROVIDE( __arm64_tls_tcb_offset = MAX(16, __tls_align) );
+  PROVIDE( __tls_align = MAX(ALIGNOF(.tdata), ALIGNOF(.tbss)) );
 
   /* BSS section */
   . = ALIGN(0x1000);
 
   .bss : {
-    HIDDEN(__bss_start__ = .);
+    HIDDEN(__bss_start = .);
     *(.bss .bss.*)
     *(COMMON)
     . = ALIGN(8);
-    HIDDEN(__bss_end__ = .);
+    HIDDEN(__bss_end = .);
     . = ALIGN(0x1000);
   } :data
+  PROVIDE( __bss_size = __bss_end - __bss_start );
+
+  . = ALIGN(8);
 
   __end__ = ABSOLUTE(.);
+  PROVIDE (__heap_start = __bss_end);
+  PROVIDE (__heap_end = __bss_end + 0x00010000);
+  PROVIDE (__heap_size = __heap_end - __heap_start);
 
   HIDDEN(__argdata__ = .);
 

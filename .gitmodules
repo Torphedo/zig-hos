@@ -4,3 +4,6 @@
 [submodule "ext/libnx"]
 	path = ext/libnx
 	url = https://github.com/switchbrew/libnx
+[submodule "ext/picolibc-zig"]
+	path = ext/picolibc-zig
+	url = https://github.com/kassane/picolibc-zig

@@ -16,13 +16,14 @@ pub fn system(cmd: []const u8) !void {
 }
 
 pub fn build_assembly_obj(src: []const u8, obj_name: []const u8) !void {
-    const cmd_base = "zig build-obj -target aarch64-freestanding -cflags -Qunused-arguments -o{s} -- {s}";
+    const cmd_base = "zig build-obj -target aarch64-freestanding-none -cflags -Qunused-arguments -o{s} -- {s}";
     const size = cmd_base.len + src.len + obj_name.len;
 
     const buffer = try gpa.allocator().alloc(u8, size);
     defer gpa.allocator().free(buffer);
 
     const cmd = try std.fmt.bufPrintZ(buffer, cmd_base, .{ obj_name, src });
+    std.debug.print("{s}\n", .{cmd});
     system(cmd) catch |err| {
         if (err == error.FileNotFound) {
             // Really dirty hack to silently discard the error that doesn't
@@ -43,6 +44,10 @@ pub fn build(b: *std.Build) !void {
         .ofmt = .elf,
     });
 
+    const libc_dep = b.dependency("picolibc", .{
+        .target = switch_target,
+    }).artifact("c");
+
     const exe = b.addExecutable(.{
         .name = "zig-hos",
         .target = switch_target,
@@ -56,12 +61,14 @@ pub fn build(b: *std.Build) !void {
     // Nevermind this bug mysteriously vanished before my very eyes
     // try build_assembly_obj(b.path("src/nro_entry.s").getPath(b), b.path("nro_entry.o").getPath(b));
     // exe.addObjectFile(b.path("nro_entry.o"));
-    // try build_assembly_obj(b.path("ext/libnx/nx/source/kernel/svc.s").getPath(), b.path("svc.o").getPath());
+    // try build_assembly_obj(b.path("ext/libnx/nx/source/kernel/svc.s").getPath(b), b.path("svc.o").getPath(b));
     // exe.addObjectFile(b.path("svc.o"));
 
     exe.addIncludePath(b.path("ext/libnx/nx/include/switch"));
+    exe.addIncludePath(b.path("ext/picolibc-zig/newlib/libc/include/"));
     exe.addAssemblyFile(b.path("ext/libnx/nx/source/kernel/svc.s"));
     exe.addAssemblyFile(b.path("src/nro_entry.s"));
+    exe.linkLibrary(libc_dep);
     exe.setLinkerScript(b.path("src/set_base_addr.ld"));
     b.installArtifact(exe);
 

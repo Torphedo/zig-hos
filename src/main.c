@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include <kernel/svc.h>
 #include <sf/tipc.h>
 #include <sf/hipc.h>
@@ -15,19 +17,22 @@ typedef enum {
 HipcHeader header = {0};
 
 int main() {
+    const char* msg = "Hello from C!\n";
+    svcOutputDebugString(msg, strlen(msg));
+
     Handle sm;
     Result rc = svcConnectToNamedPort(&sm, "sm:");
     if (rc != RESULT_SUCESS) {
-        const char sm_fail[] = "Failed to open port sm:\n";
-        svcOutputDebugString(sm_fail, sizeof(sm_fail));
+        const char* sm_fail = "Failed to open port sm:\n";
+        svcOutputDebugString(sm_fail, strlen(sm_fail));
     }
     else {
-        const char sm_pass[] = "Got Service Manager handle.\n";
-        svcOutputDebugString(sm_pass, sizeof(sm_pass));
+        // const char sm_pass[256] = {0};
+        svcOutputDebugString("Got Service manager handle!\n", 28);
+        // sprintf(sm_pass, "Got Service Manager handle 0x%x\n", &sm);
+        // svcOutputDebugString(sm_pass, strlen(sm_pass));
     }
 
-    const char msg[] = "Hello from C!\n";
-    svcOutputDebugString(msg, sizeof(msg));
     return 0;
 }
 

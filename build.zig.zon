@@ -1,0 +1,13 @@
+.{
+    .name = "zig-hos",
+    .version = "1.0.0",
+
+    .dependencies = .{
+        .picolibc = .{
+            .url = "https://github.com/elpekenin/picolibc/archive/refs/heads/zig_clean.tar.gz",
+            .hash = "12208a0e149e5fbeb7cf01fc56bd3dbdceac429091ada9e61383af868acaeef34e18",
+        },
+    },
+
+    .paths = .{ "build.zig", "build.zig.zon", "src" },
+}

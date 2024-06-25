@@ -6,13 +6,10 @@
 */
 
 .section ".text.crt0","ax"
-
-.global _start
-_start:
+_module_start:
     b main
-
     // Put MOD0 offset in the NRO file.
-    .word __nx_mod0 - _start
+    .word __nx_mod0 - _module_start
 
     // MOD0 has to start after the NRO header and at a power of 2 offset
     .balign 0x80
@@ -20,8 +17,8 @@ _start:
 __nx_mod0:
     .ascii "MOD0"
     .word  __dynamic_start__        - __nx_mod0
-    .word  __bss_start__            - __nx_mod0
-    .word  __bss_end__              - __nx_mod0
+    .word  __bss_start              - __nx_mod0
+    .word  __bss_end                - __nx_mod0
     .word  __eh_frame_hdr_start__   - __nx_mod0
     .word  __eh_frame_hdr_end__     - __nx_mod0
     .word  main - __nx_mod0
