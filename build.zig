@@ -55,6 +55,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = b.standardOptimizeOption(.{}),
     });
     exe.addCSourceFile(.{ .file = b.path("src/main.c"), .flags = &.{} });
+    exe.addCSourceFile(.{ .file = b.path("src/crt0.c"), .flags = &.{} });
 
     // Adding the assembly file normally causes Clang error because of unused
     // parameters. We have to use this helper to compile them separately...

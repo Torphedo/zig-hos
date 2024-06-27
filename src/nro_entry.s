@@ -7,7 +7,7 @@
 
 .section ".text.crt0","ax"
 _module_start:
-    b main
+    b aarch64_start
     // Put MOD0 offset in the NRO file.
     .word __nx_mod0 - _module_start
 
@@ -25,4 +25,18 @@ __nx_mod0:
 
 // Put the rest of the code at the next 0x10 boundary just to make it neater
 .balign 0x10
+
+aarch64_start:
+    // Normal picolibc init has to enable the FPU and init the stack. Since
+    // we're running under HOS, we don't need any of that.
+
+    // Jump into C code, passing it the mod0 header pointer.
+    adr x0, __nx_mod0
+    bl crt_entry
+    
+    // svcExitProcess(). Ryujinx doesn't respect this, but we'll do it anyway.
+    svc 0x7
+// Loop forever to prevent invalid opcode crashes
+loop:
+    b loop
 

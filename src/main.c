@@ -27,8 +27,8 @@ int main() {
         svcOutputDebugString(sm_fail, strlen(sm_fail));
     }
     else {
-        // const char sm_pass[256] = {0};
         svcOutputDebugString("Got Service manager handle!\n", 28);
+        // const char sm_pass[256] = {0};
         // sprintf(sm_pass, "Got Service Manager handle 0x%x\n", &sm);
         // svcOutputDebugString(sm_pass, strlen(sm_pass));
     }

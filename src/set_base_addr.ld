@@ -170,6 +170,7 @@ SECTIONS
   .tbss (NOLOAD) : {
     __tbss_align_abs__ = ABSOLUTE(.);
     __tbss_start__ = .;
+	PROVIDE( __bss_start = ADDR(.tbss));
     *(.tbss .tbss.*)
     *(.tcommon)
     __tbss_end__ = .;
@@ -181,7 +182,7 @@ SECTIONS
   . = ALIGN(0x1000);
 
   .bss : {
-    HIDDEN(__bss_start = .);
+    /* HIDDEN(__bss_start = .); */
     *(.bss .bss.*)
     *(COMMON)
     . = ALIGN(8);
