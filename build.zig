@@ -2,40 +2,67 @@ const std = @import("std");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
+// A rough recreation of C's system() function
 pub fn system(cmd: []const u8) !void {
     const allocator = gpa.allocator();
+    // This will break when quotes are involved, but it's fine for now.
+    var spliterator = std.mem.splitSequence(u8, cmd, " ");
 
-    const result = try std.ChildProcess.run(.{
-        .allocator = allocator,
-        .argv = &[_][]const u8{cmd},
-    });
-    defer {
-        allocator.free(result.stdout);
-        allocator.free(result.stderr);
+    // Find number of tokens
+    var argv_len: u16 = 0;
+    while (spliterator.next() != null) {
+        argv_len +|= 1;
     }
+    spliterator.reset();
+
+    // Fill out argv for launching the command
+    var argv = try allocator.alloc([]const u8, argv_len);
+    for (0..argv.len) |i| {
+        argv[i] = spliterator.peek().?;
+        _ = spliterator.next();
+    }
+
+    var proc = std.process.Child.init(argv, allocator);
+
+    // Launch command and wait on it to finish
+    try proc.spawn();
+    _ = try proc.wait();
 }
 
-pub fn build_assembly_obj(src: []const u8, obj_name: []const u8) !void {
+// Build an assembly file at [src] into an object file at [obj_name], and add
+// the object file to [target].
+pub fn build_assembly_obj(src: std.Build.LazyPath, obj_name: std.Build.LazyPath, target: *std.Build.Step.Compile, b: *std.Build) !void {
     const cmd_base = "zig build-obj -target aarch64-freestanding-none -cflags -Qunused-arguments -o{s} -- {s}";
-    const size = cmd_base.len + src.len + obj_name.len;
+    const size = cmd_base.len + src.getPath(b).len + obj_name.getPath(b).len;
 
     const buffer = try gpa.allocator().alloc(u8, size);
     defer gpa.allocator().free(buffer);
 
-    const cmd = try std.fmt.bufPrintZ(buffer, cmd_base, .{ obj_name, src });
-    std.debug.print("{s}\n", .{cmd});
-    system(cmd) catch |err| {
-        if (err == error.FileNotFound) {
-            // Really dirty hack to silently discard the error that doesn't
-            // seem to actually cause problems. Sorry, my coffee went cold when
-            // I was writing this.
-        }
-    };
+    const cmd = try std.fmt.bufPrintZ(buffer, cmd_base, .{ obj_name.getPath(b), src.getPath(b) });
+    try system(cmd);
+
+    target.addObjectFile(obj_name);
+}
+
+// There's a weird bug in Zig that adds parameters that aren't needed to the
+// Clang assembler command. Zig treats the Clang warnings as errors, and
+// there's no way to pass Clang flags for assembly files. The workaround is to
+// manually run "zig build-obj" with the correct flags and add the object file.
+// This bug seems to randomly appear and disappear, so this function makes the
+// workaround easy to toggle.
+fn add_asm_files(use_workaround: bool, exe: *std.Build.Step.Compile, b: *std.Build) !void {
+    if (use_workaround) {
+        try build_assembly_obj(b.path("src/nro_entry.s"), b.path("nro_entry.o"), exe, b);
+        try build_assembly_obj(b.path("src/aarch64.s"), b.path("aarch64.o"), exe, b);
+        try build_assembly_obj(b.path("ext/libnx/nx/source/kernel/svc.s"), b.path("svc.o"), exe, b);
+    } else {
+        exe.addAssemblyFile(b.path("ext/libnx/nx/source/kernel/svc.s"));
+        exe.addAssemblyFile(b.path("src/nro_entry.s"));
+        exe.addAssemblyFile(b.path("src/aarch64.s"));
+    }
 }
 
 pub fn build(b: *std.Build) !void {
-
-    // libc is unavailable, which I haven't really tried fixing yet.
     const switch_target = b.resolveTargetQuery(.{
         .cpu_arch = .aarch64,
         .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a57 },
@@ -55,20 +82,12 @@ pub fn build(b: *std.Build) !void {
         .optimize = b.standardOptimizeOption(.{}),
     });
     exe.addCSourceFile(.{ .file = b.path("src/main.c"), .flags = &.{} });
+    exe.addCSourceFile(.{ .file = b.path("src/vfile.c"), .flags = &.{} });
     exe.addCSourceFile(.{ .file = b.path("src/crt0.c"), .flags = &.{} });
 
-    // Adding the assembly file normally causes Clang error because of unused
-    // parameters. We have to use this helper to compile them separately...
-    // Nevermind this bug mysteriously vanished before my very eyes
-    // try build_assembly_obj(b.path("src/nro_entry.s").getPath(b), b.path("nro_entry.o").getPath(b));
-    // exe.addObjectFile(b.path("nro_entry.o"));
-    // try build_assembly_obj(b.path("ext/libnx/nx/source/kernel/svc.s").getPath(b), b.path("svc.o").getPath(b));
-    // exe.addObjectFile(b.path("svc.o"));
-
+    try add_asm_files(true, exe, b);
     exe.addIncludePath(b.path("ext/libnx/nx/include/switch"));
     exe.addIncludePath(b.path("ext/picolibc-zig/newlib/libc/include/"));
-    exe.addAssemblyFile(b.path("ext/libnx/nx/source/kernel/svc.s"));
-    exe.addAssemblyFile(b.path("src/nro_entry.s"));
     exe.linkLibrary(libc_dep);
     exe.setLinkerScript(b.path("src/set_base_addr.ld"));
     b.installArtifact(exe);
@@ -79,7 +98,7 @@ pub fn build(b: *std.Build) !void {
         .target = b.host,
     });
 
-    // No idea why we can't just pass in normal strings anymore, but this is required now...
+    // C source struct has more than just the path string
     elf2nro.addCSourceFile(.{ .file = b.path("ext/switch-tools/src/elf2nro.c"), .flags = &.{} });
     elf2nro.addCSourceFile(.{ .file = b.path("ext/switch-tools/src/romfs.c"), .flags = &.{} });
     elf2nro.addCSourceFile(.{ .file = b.path("ext/switch-tools/src/filepath.c"), .flags = &.{} });

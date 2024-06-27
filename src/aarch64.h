@@ -1,0 +1,2 @@
+void* tls_ptr();
+
